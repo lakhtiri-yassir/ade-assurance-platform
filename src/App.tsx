@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { Shield } from 'lucide-react'
 import SearchBar from './components/SearchBar'
 import SearchResult from './components/SearchResult'
-import DatabaseSetup from './components/DatabaseSetup'
 import { Member } from './lib/supabase'
 
 function App() {
@@ -36,8 +35,6 @@ function App() {
       {/* Main Content */}
       <main className="px-4 pb-12">
         <div className="max-w-4xl mx-auto">
-          <DatabaseSetup />
-          
           {/* Search Section */}
           <div className="mb-8">
             <SearchBar onResult={handleSearchResult} />

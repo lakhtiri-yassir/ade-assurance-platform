@@ -1,0 +1,11 @@
+<img 
+                src="/logo-ade.png" 
+                alt="Adeam Assurance Logo" 
+                className="w-8 h-8 object-contain"
+                onError={(e) => {
+                  // Fallback if image doesn't load
+                  console.error('Logo failed to load');
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
+              />

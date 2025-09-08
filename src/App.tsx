@@ -23,7 +23,7 @@ function App() {
               <img 
                 src="/logo-ade.png" 
                 alt="Adeam Assurance Logo" 
-                className="w-8 h-8 object-contain"
+                className="w-12 h-12 object-contain"
                 onError={(e) => {
                   // Fallback to shield icon if logo doesn't load
                   console.error('Logo failed to load, using fallback icon');

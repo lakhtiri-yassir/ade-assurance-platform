@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { Search, Download, User } from 'lucide-react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { Search, User } from 'lucide-react'
 import { supabase, Member } from '../lib/supabase'
 
 interface SearchBarProps {
@@ -14,46 +14,104 @@ export default function SearchBar({ onResult }: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [selectedIndex, setSelectedIndex] = useState(-1)
+  
+  // Debounce timer ref
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  // Request cancellation ref
+  const abortControllerRef = useRef<AbortController | null>(null)
 
-  useEffect(() => {
-    if (query.trim().length < 2) {
+  // Debounced search function
+  const debouncedSearch = useCallback(async (searchQuery: string) => {
+    // Cancel previous request if it exists
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController()
+
+    if (searchQuery.trim().length < 2) {
       setSuggestions([])
       setShowSuggestions(false)
+      setIsLoading(false)
       return
     }
 
-    const searchMembers = async () => {
-      setIsLoading(true)
-      try {
-        const { data, error } = await supabase
-          .from('members')
-          .select('*')
-          .or(`nom.ilike.%${query}%,prenom.ilike.%${query}%`)
-          .limit(5)
+    setIsLoading(true)
+    
+    try {
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .or(`nom.ilike.%${searchQuery}%,prenom.ilike.%${searchQuery}%`)
+        .limit(5)
 
-        if (error) throw error
-        
-        const filteredMembers = data?.filter(member => {
-          const fullName = `${member.prenom} ${member.nom}`.toLowerCase()
-          const reverseName = `${member.nom} ${member.prenom}`.toLowerCase()
-          const searchQuery = query.toLowerCase()
-          return fullName.includes(searchQuery) || reverseName.includes(searchQuery)
-        }) || []
+      // Check if request was cancelled
+      if (abortControllerRef.current?.signal.aborted) {
+        return
+      }
 
-        setSuggestions(filteredMembers)
-        setShowSuggestions(filteredMembers.length > 0)
-        setSelectedIndex(-1)
-      } catch (error) {
+      if (error) throw error
+      
+      const filteredMembers = data?.filter(member => {
+        const fullName = `${member.prenom} ${member.nom}`.toLowerCase()
+        const reverseName = `${member.nom} ${member.prenom}`.toLowerCase()
+        const searchQueryLower = searchQuery.toLowerCase()
+        return fullName.includes(searchQueryLower) || reverseName.includes(searchQueryLower)
+      }) || []
+
+      // Use setTimeout to avoid blocking the UI
+      setTimeout(() => {
+        if (!abortControllerRef.current?.signal.aborted) {
+          setSuggestions(filteredMembers)
+          setShowSuggestions(filteredMembers.length > 0)
+          setSelectedIndex(-1)
+          setIsLoading(false)
+        }
+      }, 0)
+      
+    } catch (error: any) {
+      // Don't show error if request was just cancelled
+      if (error.name !== 'AbortError') {
         console.error('Error searching members:', error)
-        setSuggestions([])
-      } finally {
-        setIsLoading(false)
+        setTimeout(() => {
+          if (!abortControllerRef.current?.signal.aborted) {
+            setSuggestions([])
+            setShowSuggestions(false)
+            setIsLoading(false)
+          }
+        }, 0)
       }
     }
+  }, [])
 
-    const debounceTimer = setTimeout(searchMembers, 300)
-    return () => clearTimeout(debounceTimer)
-  }, [query])
+  // Handle input change with debouncing
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const newQuery = e.target.value
+    setQuery(newQuery)
+
+    // Clear previous timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    // Set new timer - search after 400ms of no typing
+    debounceTimerRef.current = setTimeout(() => {
+      debouncedSearch(newQuery)
+    }, 400)
+  }, [debouncedSearch])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!showSuggestions) return
@@ -92,18 +150,19 @@ export default function SearchBar({ onResult }: SearchBarProps) {
     }
   }, [selectedIndex])
 
-  const selectMember = (member: Member) => {
+  const selectMember = useCallback((member: Member) => {
     const fullName = `${member.prenom} ${member.nom}`
     setQuery(fullName)
     setShowSuggestions(false)
     setSelectedIndex(-1)
     onResult(member)
-  }
+  }, [onResult])
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (!query.trim()) return
 
     setIsLoading(true)
+    
     try {
       const { data, error } = await supabase
         .from('members')
@@ -118,20 +177,25 @@ export default function SearchBar({ onResult }: SearchBarProps) {
         return fullName === searchQuery || reverseName === searchQuery
       })
 
-      onResult(member || null)
-      setShowSuggestions(false)
+      setTimeout(() => {
+        onResult(member || null)
+        setShowSuggestions(false)
+        setIsLoading(false)
+      }, 0)
+      
     } catch (error) {
       console.error('Error searching member:', error)
-      onResult(null)
-    } finally {
-      setIsLoading(false)
+      setTimeout(() => {
+        onResult(null)
+        setIsLoading(false)
+      }, 0)
     }
-  }
+  }, [query, onResult])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     handleSearch()
-  }
+  }, [handleSearch])
 
   return (
     <div className="relative w-full max-w-md mx-auto">
@@ -142,11 +206,10 @@ export default function SearchBar({ onResult }: SearchBarProps) {
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="TAPEZ VOTRE NOM COMPLET"
             className="w-full pl-12 pr-4 py-4 text-lg font-medium text-gray-800 placeholder-gray-400 bg-white border-0 rounded-2xl shadow-lg focus:outline-none focus:ring-2 focus:ring-black focus:shadow-xl transition-all duration-300"
-            disabled={isLoading}
           />
           {isLoading && (
             <div className="absolute right-4 top-1/2 transform -translate-y-1/2">

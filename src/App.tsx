@@ -41,7 +41,7 @@ function App() {
               />
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-gray-800 tracking-tight">
-              adeam-assurance
+              ADEAM ASSURANCE
             </h1>
           </div>
           <p className="text-gray-600 text-lg font-medium">
@@ -65,7 +65,7 @@ function App() {
 
       {/* Footer */}
       <footer className="mt-auto py-8 text-center text-gray-500 text-sm">
-        <p>&copy; 2025 adeam-assurance. Tous droits réservés.</p>
+        <p>&copy; 2025 ADEAM ASSURANCE. Tous droits réservés.</p>
       </footer>
     </div>
   )

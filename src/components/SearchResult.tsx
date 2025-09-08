@@ -1,6 +1,6 @@
 import React from 'react'
 import { Download, AlertCircle, CheckCircle2 } from 'lucide-react'
-import { Member } from '../lib/supabase'
+import { Member, supabase } from '../lib/supabase'
 
 interface SearchResultProps {
   member: Member | null
@@ -10,15 +10,31 @@ interface SearchResultProps {
 export default function SearchResult({ member, searched }: SearchResultProps) {
   if (!searched) return null
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!member) return
     
-    // Create a mock download link
-    // In production, this would link to your actual PDF storage
-    const link = document.createElement('a')
-    link.href = `/pdfs/${member.pdf_name}`
-    link.download = member.pdf_name
-    link.click()
+    try {
+      // Get the public URL for the PDF
+      const { data } = supabase.storage
+        .from('pdfs')
+        .getPublicUrl(member.pdf_name)
+      
+      if (data?.publicUrl) {
+        // Create a download link
+        const link = document.createElement('a')
+        link.href = data.publicUrl
+        link.download = member.pdf_name
+        link.target = '_blank' // Open in new tab if direct download fails
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } else {
+        throw new Error('Could not get file URL')
+      }
+    } catch (error) {
+      console.error('Download error:', error)
+      alert('Erreur lors du téléchargement du fichier. Veuillez réessayer.')
+    }
   }
 
   if (!member) {

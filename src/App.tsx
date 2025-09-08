@@ -40,7 +40,7 @@ function App() {
                 }}
               />
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-800 tracking-tight">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 tracking-tight">
               ADEAM ASSURANCE
             </h1>
           </div>
